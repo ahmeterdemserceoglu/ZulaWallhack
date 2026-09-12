@@ -7,7 +7,6 @@
 PVIRTUAL_MACHINE_STATE g_GuestStates[256] = {0};
 
 NTKERNELAPI PVOID PsGetProcessSectionBaseAddress(PEPROCESS Process);
-NTKERNELAPI ULONG_PTR PsGetProcessDirBase(PEPROCESS Process);
 #define CMD_GET_BASE 3
 
 extern void __stdcall AsmGetSegmentRegisters(PVOID State);
@@ -185,6 +184,25 @@ void SetupVmcb(PVIRTUAL_MACHINE_STATE state) {
     vmcb->StateSaveArea.Sfmask = __readmsr(0xC0000084);
     
     AsmGetSegmentRegisters(&vmcb->StateSaveArea);
+    
+    // Parse GDT to get the 64-bit base addresses for TR and LDTR
+    ULONG64 gdtBase = vmcb->StateSaveArea.Gdtr.Base;
+    
+    ULONG16 trSelector = vmcb->StateSaveArea.Tr.Selector;
+    if (trSelector) {
+        PUCHAR desc = (PUCHAR)(gdtBase + (trSelector & ~7));
+        ULONG64 base = (ULONG64)desc[2] | ((ULONG64)desc[3] << 8) | ((ULONG64)desc[4] << 16) | ((ULONG64)desc[7] << 24);
+        base |= ((ULONG64)(*(PULONG)(desc + 8)) << 32);
+        vmcb->StateSaveArea.Tr.Base = base;
+    }
+    
+    ULONG16 ldtrSelector = vmcb->StateSaveArea.Ldtr.Selector;
+    if (ldtrSelector) {
+        PUCHAR desc = (PUCHAR)(gdtBase + (ldtrSelector & ~7));
+        ULONG64 base = (ULONG64)desc[2] | ((ULONG64)desc[3] << 8) | ((ULONG64)desc[4] << 16) | ((ULONG64)desc[7] << 24);
+        base |= ((ULONG64)(*(PULONG)(desc + 8)) << 32);
+        vmcb->StateSaveArea.Ldtr.Base = base;
+    }
 }
 
 // ==========================================
@@ -243,7 +261,10 @@ ULONG64 TranslateLinearAddress(ULONG64 directoryTableBase, ULONG64 virtualAddres
 ULONG64 GetProcessCr3(ULONG targetPid) {
     PEPROCESS process = NULL;
     if (NT_SUCCESS(PsLookupProcessByProcessId((HANDLE)(ULONG_PTR)targetPid, &process))) {
-        ULONG_PTR cr3 = PsGetProcessDirBase(process);
+        KAPC_STATE apcState;
+        KeStackAttachProcess(process, &apcState);
+        ULONG64 cr3 = __readcr3();
+        KeUnstackDetachProcess(&apcState);
         ObDereferenceObject(process);
         return cr3;
     }
