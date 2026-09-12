@@ -1,0 +1,46 @@
+[Version]
+Signature="$WINDOWS NT$"
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider=%ManufacturerName%
+DriverVer=09/12/2026,1.0.0.0
+CatalogFile=ZulaDriver.cat
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+ZulaDriver.sys = 1,,
+
+[Manufacturer]
+%ManufacturerName%=Standard,NTamd64
+
+[Standard.NTamd64]
+%ZulaDriver.DeviceDesc%=ZulaDriver_Device, Root\ZulaDriver
+
+[ZulaDriver_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+ZulaDriver.sys
+
+[ZulaDriver_Device.NT.Services]
+AddService = ZulaDriver,%SPSVCINST_ASSOCSERVICE%, ZulaDriver_Service_Inst
+
+[ZulaDriver_Service_Inst]
+DisplayName    = %ZulaDriver.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\ZulaDriver.sys
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="ZulaDriver"
+DiskName="ZulaDriver Source Disk"
+ZulaDriver.DeviceDesc="ZulaDriver Device"
+ZulaDriver.SVCDESC="ZulaDriver Service"
